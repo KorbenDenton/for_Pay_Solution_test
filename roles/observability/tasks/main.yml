@@ -1,2 +1,71 @@
 ---
-# tasks file for roles/observability
+- name: Create node_exporter system group
+  ansible.builtin.group:
+    name: node_exporter
+    system: true
+    state: present
+
+- name: Create node_exporter system user
+  ansible.builtin.user:
+    name: node_exporter
+    group: node_exporter
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+    state: present
+
+- name: Download node_exporter binary
+  ansible.builtin.get_url:
+    url: "{{ node_exporter_download_url }}"
+    dest: /tmp/node_exporter.tar.gz
+    mode: '0644'
+  register: _download
+
+- name: Extract node_exporter binary
+  ansible.builtin.unarchive:
+    src: /tmp/node_exporter.tar.gz
+    dest: /tmp
+    remote_src: true
+  when: _download.changed  # идемпотентность: распаковываем только при новом скачивании
+
+- name: Install node_exporter binary
+  ansible.builtin.copy:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-{{ node_exporter_arch }}/node_exporter"
+    dest: "{{ node_exporter_bin_path }}"
+    owner: node_exporter
+    group: node_exporter
+    mode: '0755'
+    remote_src: true
+  notify: Restart node_exporter
+
+- name: Clean temporary files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/node_exporter.tar.gz
+    - "/tmp/node_exporter-{{ node_exporter_version }}.linux-{{ node_exporter_arch }}"
+
+- name: Deploy systemd unit file
+  ansible.builtin.template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Reload systemd
+    - Restart node_exporter
+
+- name: Enable and start node_exporter service
+  ansible.builtin.systemd:
+    name: node_exporter
+    enabled: true
+    state: started
+
+- name: Open node_exporter port for specific IP
+  community.general.ufw:
+    rule: allow
+    port: '9100'
+    proto: tcp
+    src: "{{ monitoring_server_ip }}"  # IP-адрес Prometheus

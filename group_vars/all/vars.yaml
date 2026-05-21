@@ -1,0 +1,3 @@
+---
+app_config_dir: /etc/example-app
+app_config_file: "{{ app_config_dir }}/config.env"

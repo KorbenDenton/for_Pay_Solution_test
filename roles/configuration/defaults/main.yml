@@ -1,2 +1,9 @@
 ---
-# defaults file for roles/configuration
+# Пользователь для SSH-доступа
+ssh_allow_user: ops
+# Список базовых пакетов для установки
+base_packages:
+  - fail2ban
+  - auditd
+  - curl
+  - jq

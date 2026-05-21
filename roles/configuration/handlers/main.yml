@@ -1,2 +1,5 @@
 ---
-# handlers file for roles/configuration
+- name: Restart sshd
+  ansible.builtin.service:
+    name: sshd
+    state: restarted

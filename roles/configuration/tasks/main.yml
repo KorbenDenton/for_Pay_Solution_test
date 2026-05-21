@@ -1,2 +1,85 @@
----
 # tasks file for roles/configuration
+---
+# 1. Создание пользователя ops
+- name: Ensure group 'ops' exists
+  ansible.builtin.group:
+    name: ops
+    state: present
+
+- name: Ensure user 'ops' exists with sudo privileges
+  ansible.builtin.user:
+    name: ops
+    group: ops
+    groups: sudo
+    append: yes
+    state: present
+    create_home: yes
+
+- name: Ensure .ssh directory for ops user
+  ansible.builtin.file:
+    path: /home/ops/.ssh
+    state: directory
+    owner: ops
+    group: ops
+    mode: '0700'
+
+- name: Ensure SSH public key for ops user
+  ansible.posix.authorized_key:
+    user: ops
+    state: present
+    key: "{{ lookup('file', 'authorized_keys') }}"
+
+- name: Ensure passwordless sudo for 'ops' user
+  ansible.builtin.template:
+    src: sudoers_ops.j2
+    dest: /etc/sudoers.d/ops
+    mode: '0440'
+    validate: 'visudo -cf %s'
+
+# 2. Настройка SSH
+- name: Ensure SSH is configured securely
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^{{ item.param }} "
+    line: "{{ item.param }} {{ item.value }}"
+    validate: 'sshd -t -f %s'
+  loop:
+    - { param: 'PermitRootLogin', value: 'no' }
+    - { param: 'PasswordAuthentication', value: 'no' }
+    - { param: 'AllowUsers', value: '{{ ssh_allow_user }}' }
+  notify: Restart sshd
+
+# 3. Настройка фаервола (UFW)
+- name: Ensure UFW is installed
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+
+- name: Ensure default UFW policy is deny incoming
+  community.general.ufw:
+    direction: incoming
+    policy: deny
+    state: enabled
+
+- name: Ensure outgoing traffic is allowed by default
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
+    state: enabled
+
+- name: Ensure SSH traffic is allowed
+  community.general.ufw:
+    rule: allow
+    port: '22'
+    proto: tcp
+
+- name: Ensure UFW is enabled
+  community.general.ufw:
+    state: enabled
+
+# 4. Установка базовых пакетов
+- name: Ensure base packages are installed
+  ansible.builtin.apt:
+    name: "{{ base_packages }}"
+    state: present
+    update_cache: yes

@@ -1,0 +1,4 @@
+---
+# Секретные переменные для приложения
+vault_app_token: "s3cr3t-t0k3n-f0r-ex4mpl3-4pp"
+vault_db_password: "sup3r-s3cur3-p4ssw0rd"
