@@ -1,0 +1,17 @@
+---
+- name: Create app config directory
+  ansible.builtin.file:
+    path: "{{ app_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Deploy app config from template
+  ansible.builtin.template:
+    src: config.env.j2
+    dest: "{{ app_config_file }}"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true   # КРИТИЧНО: предотвращает вывод секретов в лог Ansible
